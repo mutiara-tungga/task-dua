@@ -1,0 +1,28 @@
+TASK SELANJUTNYA :
+abis ini berarti coba bikin repo baru dan tasknya adalah
+
+1. API untuk register user  {first_name, last_name, email, password}
+- flownya ketika user baru berhasil register kirim email menggunakan *postmarkapp* service isinya informasi akun user dan link aktivasi
+
+
+2. API untuk login user {email, password}
+- user yang sudah diaktivasi dan password benar yang bisa login
+- bila sukses tampilkan token sebagai authentikasi pakai library *jwt token*
+
+
+3. API aktivasi user with param {activation_code}
+- apabila activation cocok maka update status user activation = 1
+
+
+4. API myprofile
+- menggunakan param key header Authorization diisi dengan token yang didapat dari login
+- apabila token tidak cocok maka throw return status code 403
+
+postmarkapp service
+sender : no-reply@skyshi.com
+
+api key : 61948b71-3cd3-42a5-aedb-5a3aca8d1053
+
+NEED :
+library postmarkapp : https://www.npmjs.com/package/postmark
+ini library token jwt : https://www.npmjs.com/package/express-jwt

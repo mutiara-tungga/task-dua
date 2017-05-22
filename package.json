@@ -1,0 +1,21 @@
+{
+  "name": "task-dua",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.17.2",
+    "bookshelf": "^0.10.3",
+    "express": "^4.15.3",
+    "express-validator": "^3.2.0",
+    "knex": "^0.13.0",
+    "mysql": "^2.13.0",
+    "validate.js": "^0.11.1"
+  }
+}
