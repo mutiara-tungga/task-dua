@@ -5,7 +5,7 @@ var expressValidator = require('express-validator');
 var _ = require('underscore');
 
 var postmark = require('postmark');
-var client = new postmark.client('61948b71-3cd3-42a5-aedb-5a3aca8d1053');
+var client = new postmark.Client('61948b71-3cd3-42a5-aedb-5a3aca8d1053');
 //var middleware = require('./middleware');//
 
 var app = express();
@@ -57,7 +57,12 @@ app.post('/user', function (req, res) {
                 password: user.password
             }).save()
                 .then(function (model) {
-                    
+                    client.sendEmail({
+                        "From": "no-reply@skyshi.com",
+                        "To": user.email,
+                        "Subject": "Test",
+                        "TextBody": "Your account : \n- First Name :" + user.firstName
+                    });
                     res.send(model.toJSON());
                 }).catch(function (error) {
                     console.log(error);
