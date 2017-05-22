@@ -1,8 +1,9 @@
-//{first_name, last_name, email, password}
+// //{first_name, last_name, email, password}
 // var express = require('express');
-// var app = express();
-
+// var validate = require("validate.js");
 // var bodyParser = require('body-parser');
+
+// var app = express();
 // app.use(bodyParser.json());
 
 // var constraints = {
@@ -10,10 +11,14 @@
 //         presence: true
 //     },
 //     last_name: {
-
+//         presence: true
 //     },
 //     email: {
-
+//         presence: true,
+//         email: true
+//     },
+//     password: {
+//         presence: true
 //     }
 // }
 
