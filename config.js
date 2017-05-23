@@ -1,5 +1,5 @@
 var randomstring = require('randomstring');
-var randomKeySecret = randomstring.generate(5);
+var randomKeySecret = 'secretSecretSecret';
 
 module.exports = {
     database: {

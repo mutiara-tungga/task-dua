@@ -1,40 +1,31 @@
+var express = require('express');
+var bodyParser = require('body-parser');
+var jwt = require('jsonwebtoken');
+var config = require('./config');
+
+var app = express();
+app.use(bodyParser.json());
+
 module.exports = {
+    authentication: function (req, res, next) {
+        var token = req.headers['auth'];
 
+        if (token) {
+            jwt.verify(token, config.secret, function (err, decoded) {
+                if (err) {
+                    return res.send({
+                        messageError: 'Authentication failed'
+                    });
+                } else {
+                    req.decoded = decoded;
+                    next();
+                }
+            })
+        } else {
+            return res.status(403)
+                .send({ 
+                    messageError:'No token'
+                });
+        }
+    }
 }
-
-// //{first_name, last_name, email, password}
-// var express = require('express');
-// var validate = require("validate.js");
-// var bodyParser = require('body-parser');
-
-// var app = express();
-// app.use(bodyParser.json());
-
-// var constraints = {
-//     first_name: {
-//         presence: true
-//     },
-//     last_name: {
-//         presence: true
-//     },
-//     email: {
-//         presence: true,
-//         email: true
-//     },
-//     password: {
-//         presence: true
-//     }
-// }
-
-// module.exports = {
-//     validation: function (req, res, next) {
-//         var body = req.body;
-//         console.log(req.method);
-//         console.log(body);
-//         var first_name = req.body.first_name;
-
-//         validate({ first_name: first_name }, constraints);
-//         validate.isString(first_name);
-//         next();
-//     }
-// };

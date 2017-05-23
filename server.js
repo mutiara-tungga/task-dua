@@ -1,6 +1,7 @@
 var config = require('./config');
 var routes = require('./routes');
 var bookshelf = require('./bookshelf');
+var middleware = require('./middleware');
 
 var express = require('express');
 var bodyParser = require('body-parser');
@@ -11,13 +12,10 @@ var postmark = require('postmark');
 var jwt = require('jsonwebtoken');
 
 var client = new postmark.Client(config.apiKeyPostmarkapp);
-//var middleware = require('./middleware');//
 
 var app = express();
 app.use(bodyParser.json());
 app.use(expressValidator());
-app.set('secret', config.secret); // secret variable
-//app.use(middleware.validation);//
 
 var PORT = process.env.PORT || 3000; // used to create, sign, and verify tokens
 
@@ -54,12 +52,14 @@ app.post(routes.user, function (req, res) {
     req.getValidationResult()
         .then(function (result) {
             if (!result.isEmpty()) {
-                return res.status(400).send('Validasi error');
+                return res.status(400)
+                    .send({ 
+                        messageError: 'Validasi error' 
+                    });
             }
             var activationCode = randomstring.generate(20);
             var user = _.pick(req.body, 'firstName', 'lastName', 'email', 'password');
             var linkActivation = config.baseurl + routes.accountActivation + "?code=" + activationCode + "&email=" + user.email;
-            console.log(linkActivation);
             new Users({
                 first_name: user.firstName,
                 last_name: user.lastName,
@@ -83,7 +83,9 @@ app.post(routes.user, function (req, res) {
                     });
                     res.send(model.toJSON());
                 }).catch(function (error) {
-                    console.log(error);
+                    res.send({
+                        errorMessage: error
+                    });
                 })
         });//akhir get validation
 
@@ -104,44 +106,68 @@ app.get(routes.accountActivation, function (req, res) {
             { status: 1 },
             { patch: true }
             ).then(function (model) {
-                res.send('Aktivasi Berhasil');
-                console.log('Aktivasi berhasil');
+                res.send({
+                    message: 'Aktivasi akun berhasil silahkan login'
+                });
             }).catch(function (error) {
-                console.log(error);
-                res.send('Error');
+                res.send({
+                    errorMessage: "Aktivasi akun gagal"
+                });
             });
     }
 });
 
 //login
 app.post(routes.login, function (req, res) {
-    console.log(req.body);
+
     new Users().where({
         email: req.body.email,
         password: req.body.password,
         status: 1
     }).fetch()
-    .then(function (model) {
-        var user = {
-            id: model.id,
-            email: model.email,
-        };
+        .then(function (model) {
+            var user = {
+                id: model.id,
+                email: model.attributes['email']
+            };
 
-        console.log("secret : "+app.get('secret'));
-        var token = jwt.sign(user, app.get('secret'), {
-            expiresIn: '1h' 
+            var token = jwt.sign(user, config.secret, {
+                expiresIn: '1h'
+            });
+
+            res.send({
+                token: token,
+                message: 'Berhasil login'
+            });
+        }).catch(function (error) {
+            res.send({
+                errorMessage: "Authentication failed"
+            });
+        })
+});
+
+app.use(middleware.authentication);
+app.post(routes.myProfile, middleware.authentication, function (req, res) {
+    var id = req.decoded.id;
+    var email = req.decoded.email;
+
+    new Users().where({
+        id: id,
+        email: email
+    }).fetch()
+        .then(function (model) {
+            res.send({
+                firstName: model.attributes.first_name,
+                lastName: model.attributes.last_name,
+                email: model.attributes.email
+            });
+        }).catch(function (error) {
+            res.send({
+                errorMessage: error
+            });
         });
+})
 
-        res.send(token);
-        console.log(token);
-    }).catch(function (error) {
-        console.log(error);
-        res.send("Authentication failed");
-    })
-});
-
-app.listen(PORT, function () {
-    console.log('PORT : ' + PORT);
-});
+app.listen(PORT);
 
 
