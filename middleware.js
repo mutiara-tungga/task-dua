@@ -14,7 +14,7 @@ module.exports = {
             jwt.verify(token, config.secret, function (err, decoded) {
                 if (err) {
                     return res.send({
-                        messageError: 'Authentication failed'
+                        messageError: 'Authentication failed : ' + err
                     });
                 } else {
                     req.decoded = decoded;
@@ -23,8 +23,8 @@ module.exports = {
             })
         } else {
             return res.status(403)
-                .send({ 
-                    messageError:'No token'
+                .send({
+                    messageError: 'No token'
                 });
         }
     }
