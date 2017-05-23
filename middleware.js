@@ -1,3 +1,7 @@
+module.exports = {
+
+}
+
 // //{first_name, last_name, email, password}
 // var express = require('express');
 // var validate = require("validate.js");

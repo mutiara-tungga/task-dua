@@ -8,6 +8,7 @@ var expressValidator = require('express-validator');
 var _ = require('underscore');
 var randomstring = require('randomstring');
 var postmark = require('postmark');
+var jwt = require('jsonwebtoken');
 
 var client = new postmark.Client(config.apiKeyPostmarkapp);
 //var middleware = require('./middleware');//
@@ -15,9 +16,10 @@ var client = new postmark.Client(config.apiKeyPostmarkapp);
 var app = express();
 app.use(bodyParser.json());
 app.use(expressValidator());
+app.set('secret', config.secret); // secret variable
 //app.use(middleware.validation);//
 
-var PORT = 3000; //env
+var PORT = process.env.PORT || 3000; // used to create, sign, and verify tokens
 
 var Users = bookshelf.Model.extend({
     tableName: 'users'
@@ -25,6 +27,7 @@ var Users = bookshelf.Model.extend({
 
 app.use(expressValidator());
 
+//new user
 app.post(routes.user, function (req, res) {
     var schema = {
         'firstName': {
@@ -54,8 +57,8 @@ app.post(routes.user, function (req, res) {
                 return res.status(400).send('Validasi error');
             }
             var activationCode = randomstring.generate(20);
-            var user = _.pick(req.body, 'firstName', 'lastName', 'email', 'password');        
-            var linkActivation = config.baseurl + routes.accountActivation +"?code=" + activationCode + "&email=" + user.email;
+            var user = _.pick(req.body, 'firstName', 'lastName', 'email', 'password');
+            var linkActivation = config.baseurl + routes.accountActivation + "?code=" + activationCode + "&email=" + user.email;
             console.log(linkActivation);
             new Users({
                 first_name: user.firstName,
@@ -74,9 +77,9 @@ app.post(routes.user, function (req, res) {
                         + user.firstName + "<br> - Last Name : "
                         + user.lastName + "<br> - Email : "
                         + user.email + "<br> - Password : "
-                        + user.password + "<br>To activate your account visit link below : <a href='" 
+                        + user.password + "<br>To activate your account visit link below : <a href='"
                         + linkActivation + "'>Activate my account</a></p></body></html>"
-                        
+
                     });
                     res.send(model.toJSON());
                 }).catch(function (error) {
@@ -86,7 +89,7 @@ app.post(routes.user, function (req, res) {
 
 });
 
-
+//aktivasi akun
 app.get(routes.accountActivation, function (req, res) {
     var queryParams = req.query;
 
@@ -110,7 +113,32 @@ app.get(routes.accountActivation, function (req, res) {
     }
 });
 
-app.post
+//login
+app.post(routes.login, function (req, res) {
+    console.log(req.body);
+    new Users().where({
+        email: req.body.email,
+        password: req.body.password,
+        status: 1
+    }).fetch()
+    .then(function (model) {
+        var user = {
+            id: model.id,
+            email: model.email,
+        };
+
+        console.log("secret : "+app.get('secret'));
+        var token = jwt.sign(user, app.get('secret'), {
+            expiresIn: '1h' 
+        });
+
+        res.send(token);
+        console.log(token);
+    }).catch(function (error) {
+        console.log(error);
+        res.send("Authentication failed");
+    })
+});
 
 app.listen(PORT, function () {
     console.log('PORT : ' + PORT);
