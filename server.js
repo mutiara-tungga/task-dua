@@ -1,12 +1,15 @@
+var config = require('./config');
+var routes = require('./routes');
 var bookshelf = require('./bookshelf');
+
 var express = require('express');
 var bodyParser = require('body-parser');
 var expressValidator = require('express-validator');
 var _ = require('underscore');
 var randomstring = require('randomstring');
-
 var postmark = require('postmark');
-var client = new postmark.Client('61948b71-3cd3-42a5-aedb-5a3aca8d1053');
+
+var client = new postmark.Client(config.apiKeyPostmarkapp);
 //var middleware = require('./middleware');//
 
 var app = express();
@@ -14,7 +17,7 @@ app.use(bodyParser.json());
 app.use(expressValidator());
 //app.use(middleware.validation);//
 
-var PORT = 3000;
+var PORT = 3000; //env
 
 var Users = bookshelf.Model.extend({
     tableName: 'users'
@@ -22,7 +25,7 @@ var Users = bookshelf.Model.extend({
 
 app.use(expressValidator());
 
-app.post('/user', function (req, res) {
+app.post(routes.user, function (req, res) {
     var schema = {
         'firstName': {
             notEmpty: true,
@@ -51,8 +54,9 @@ app.post('/user', function (req, res) {
                 return res.status(400).send('Validasi error');
             }
             var activationCode = randomstring.generate(20);
-            var user = _.pick(req.body, 'firstName', 'lastName', 'email', 'password');
-            var linkActivation = "localhost:3000/user/activation?code=" + activationCode + "&email=" + user.email;
+            var user = _.pick(req.body, 'firstName', 'lastName', 'email', 'password');        
+            var linkActivation = config.baseurl + routes.accountActivation +"?code=" + activationCode + "&email=" + user.email;
+            console.log(linkActivation);
             new Users({
                 first_name: user.firstName,
                 last_name: user.lastName,
@@ -64,12 +68,15 @@ app.post('/user', function (req, res) {
                     client.sendEmail({
                         "From": "no-reply@skyshi.com",
                         "To": user.email,
-                        "Subject": "Test",
-                        "TextBody": "Your account : \n- First Name :"
-                        + user.firstName + "\n- Last Name : " 
-                        + user.lastName + "\n- Email : " 
-                        + user.email + "\n- Password : " 
-                        + user.password + "\n To activate your account visit link below : \n" + linkActivation
+                        "Subject": "Account Activation",
+                        "TextBody": "Hello",
+                        "HtmlBody": "<html><body><p> Your Account : <br> First Name : "
+                        + user.firstName + "<br> - Last Name : "
+                        + user.lastName + "<br> - Email : "
+                        + user.email + "<br> - Password : "
+                        + user.password + "<br>To activate your account visit link below : <a href='" 
+                        + linkActivation + "'>Activate my account</a></p></body></html>"
+                        
                     });
                     res.send(model.toJSON());
                 }).catch(function (error) {
@@ -79,7 +86,8 @@ app.post('/user', function (req, res) {
 
 });
 
-app.get('/user/activation', function (req, res) {
+
+app.get(routes.accountActivation, function (req, res) {
     var queryParams = req.query;
 
     if (queryParams.hasOwnProperty('code') & queryParams.hasOwnProperty('email')) {
