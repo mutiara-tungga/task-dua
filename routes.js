@@ -6,6 +6,7 @@ var jwt = require('jsonwebtoken');
 var randomstring = require('randomstring');
 var _ = require('underscore');
 var postmark = require('postmark');
+var bcrypt = require('bcrypt');
 
 var client = new postmark.Client(config.apiKeyPostmarkapp);
 
@@ -49,11 +50,12 @@ module.exports = function (app) {
                 var activationCode = randomstring.generate(20);
                 var user = _.pick(req.body, 'firstName', 'lastName', 'email', 'password');
                 var linkActivation = config.baseurl + '/user/activation' + "?code=" + activationCode + "&email=" + user.email;
+                var hashPassword = bcrypt.hashSync(user.password, 10); //hash password
                 new Users({
                     first_name: user.firstName,
                     last_name: user.lastName,
                     email: user.email,
-                    password: user.password,
+                    password: hashPassword,
                     activaion_code: activationCode
                 }).save()
                     .then(function (model) {
@@ -112,30 +114,47 @@ module.exports = function (app) {
 
     //login
     app.post('/user/login', function (req, res) {
+
         new Users().where({
             email: req.body.email,
-            password: req.body.password,
             status: 1
         }).fetch()
             .then(function (model) {
-                var user = {
-                    id: model.id,
-                    email: model.attributes['email']
-                };
+                password = req.body.password;
+                if (typeof password !== 'string' && typeof password !== 'undefined') {
+                    password = password.toString();
+                } else if (req.password === 'undefined') {
+                    res.send({
+                        messageError: "Password wrong"
+                    });
+                }
+                console.log(typeof password);
+                console.log(typeof model.attributes.password);
+                if (bcrypt.compareSync(password, model.attributes.password)) {
+                    var user = {
+                        id: model.id,
+                        email: model.attributes['email']
+                    };
 
-                var token = jwt.sign(user, config.secret, {
-                    expiresIn: '1h'
-                });
+                    var token = jwt.sign(user, config.secret, {
+                        expiresIn: '1d'
+                    });
 
-                res.send({
-                    token: token,
-                    message: 'Berhasil login'
-                });
+                    res.send({
+                        token: token,
+                        message: 'Berhasil login'
+                    });
+                } else {
+                    res.send({
+                        errorMessage: "Password do not match"
+                    })
+                }
+
             }).catch(function (error) {
                 res.send({
                     errorMessage: "Authentication failed : " + error
                 });
-            })
+            });
     });
 
 

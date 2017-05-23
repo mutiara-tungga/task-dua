@@ -10,9 +10,6 @@ app.use(expressValidator());
 
 var PORT = process.env.PORT || 3000; // used to create, sign, and verify tokens
 
-
-app.use(expressValidator());
-
 require('./routes')(app);
 
 app.listen(PORT);
