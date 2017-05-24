@@ -7,15 +7,34 @@ var randomstring = require('randomstring');
 var _ = require('underscore');
 var postmark = require('postmark');
 var bcrypt = require('bcrypt');
+var bodyParser = require('body-parser');
 var expressValidator = require('express-validator');
 
 var client = new postmark.Client(config.apiKeyPostmarkapp);
 
 var Users = bookshelf.Model.extend({
-    tableName: 'users'
+    tableName: 'users',
+    initialize: function () {
+        this.on('saving', this.assertEmailUnique); //sebelum melakukan saving melakukan assertEmailUnique
+    },
+    assertEmailUnique: function (model, attributes, options) {
+        if (this.hasChanged('email')) {
+            return Users
+                .query('where', 'email', this.get('email'))
+                .fetch(_.pick(options || {}, 'transacting'))
+                .then(function (existing) {
+                    if (existing) {
+                        throw new Error('Email must unique');
+                    }
+
+                });
+        }
+    }
+    //querying on this will constrain your query to the current record, you need to query from scratch, using plain User
 });
 
 module.exports = function (app) {
+    app.use(bodyParser.json());
     app.use(expressValidator());
 
     //new user
@@ -47,24 +66,9 @@ module.exports = function (app) {
                 if (!result.isEmpty()) {
                     return res.status(400)
                         .send({
-                            messageError: 'Validasi error'
+                            messageError: 'Validasi error' + result
                         });
                 }
-
-                new Users().where({
-                    email: req.body.email
-                }).count('id')
-                    .then(function (count) {
-                        if (count > 0) {
-                            return res.send({
-                                message: "Email must be unique"
-                            })
-                        }
-                    }).catch(function (error) {
-                        res.send({
-                            message: "Error" + error
-                        })
-                    });
 
                 var activationCode = randomstring.generate(20);
                 var user = _.pick(req.body, 'firstName', 'lastName', 'email', 'password');
