@@ -13,7 +13,8 @@ module.exports = function (app) {
     app.post('/user', controller.createNewUser);
     app.get('/user/activation', controller.accountActivation);
     app.post('/user/login', controller.login);
-    
-    app.use(middleware.authentication);
+
     app.post('/user/profile', middleware.authentication, controller.profile);
+    app.post('/user/forgotPassword', controller.forgotPassword);
+    app.post('/user/resetPassword', controller.resetPassword);
 }

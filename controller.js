@@ -15,10 +15,10 @@ var Users = bookshelf.Model.extend({
         this.on('saving', this.assertEmailUnique); //sebelum melakukan saving melakukan assertEmailUnique
     },
     assertEmailUnique: function (model, attributes, options) {
-        if (this.hasChanged('email')) {
+        if (this.hasChanged('email')) { //bila ada perubahan pada password
             return Users
                 .query('where', 'email', this.get('email'))
-                .fetch(_.pick(options || {}, 'transacting'))
+                .fetch(_.pick(options || {}, 'transacting')) //transacting mksudnya adalah run query in transaction
                 .then(function (existing) {
                     if (existing) {
                         throw new Error('Email must unique');
@@ -75,7 +75,7 @@ exports.createNewUser = function (req, res) {
             }).save()
                 .then(function (model) {
                     client.sendEmail({
-                        "From": "no-reply@skyshi.com",
+                        "From": config.postmarkappServiceSender,
                         "To": user.email,
                         "Subject": "Account Activation",
                         "TextBody": "Hello",
@@ -186,4 +186,77 @@ exports.profile = function (req, res) {
                 errorMessage: "Error " + error
             });
         });
+}
+
+exports.forgotPassword = function (req, res) {
+    var email = req.body.email;
+    var randomCode = randomstring.generate(20);
+    if (email != undefined) {
+        Users
+            .forge({ //biar nanti kembaliannya adalah model yang tidak perlu "new"
+                email: req.body.email
+            }).fetch({ require: true })
+            .then(function (user) { //user adalah model yang tidak perlu kata "new""
+                user.save({
+                    reset_password_code: randomCode
+                }).then(function (model) {
+                    client.sendEmail({
+                        "From": config.postmarkappServiceSender,
+                        "To": model.attributes.email,
+                        "Subject": "Reset Password",
+                        "TextBody": "To reset your password use this code : " + model.attributes.reset_password_code
+                    });
+                    res.send({
+                        message: "Silahkan cek email untuk reset password"
+                    })
+                }).catch(function (error) {
+                    res.send({
+                        errorMessage: 'Error ' + error
+                    });
+                })
+
+            }).catch(function (error) {
+                res.send({
+                    messageError: "Error " + error
+                });
+            });
+    }
+
+}
+
+exports.resetPassword = function (req, res) {
+    var user = _.pick(req.body, 'email', 'code', 'newPassword');
+
+    if (user.email !== 'undefined' && user.code !== 'undefined' && user.newPassword !== 'undefined') {
+        hasNewPassword = bcrypt.hashSync(user.newPassword, 10);
+        Users
+            .forge({
+                email: user.email,
+                reset_password_code: user.code
+            }).fetch({ require: true })
+            .then(function (model) {
+                if (model.attributes.reset_password_code !== null) {
+                    model.save({
+                        password: hasNewPassword,
+                        reset_password_code: null
+                    }).then(function () {
+                        res.send({
+                            message: "Berhasil reset password"
+                        });
+                    }).catch(function (error) {
+                        res.send({
+                            messageError: "Error" + error
+                        })
+                    });
+                } else {
+                    return res.send({
+                        messageError: "You didn't have reset code for password"
+                    })
+                }
+            }).catch(function (error) {
+                res.send({
+                    messageError: "Error " + error
+                });
+            })
+    }
 }

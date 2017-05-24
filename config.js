@@ -1,6 +1,3 @@
-var randomstring = require('randomstring');
-var randomKeySecret = 'secretSecretSecret';
-
 module.exports = {
     database: {
         client: 'mysql',
@@ -14,5 +11,6 @@ module.exports = {
     },
     baseurl: "http://localhost:3000",
     apiKeyPostmarkapp: "61948b71-3cd3-42a5-aedb-5a3aca8d1053",
-    secret : randomKeySecret
+    secret: 'secretSecretSecret',
+    postmarkappServiceSender: 'no-reply@skyshi.com'
 }
