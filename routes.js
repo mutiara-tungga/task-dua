@@ -7,6 +7,7 @@ var randomstring = require('randomstring');
 var _ = require('underscore');
 var postmark = require('postmark');
 var bcrypt = require('bcrypt');
+var expressValidator = require('express-validator');
 
 var client = new postmark.Client(config.apiKeyPostmarkapp);
 
@@ -15,6 +16,8 @@ var Users = bookshelf.Model.extend({
 });
 
 module.exports = function (app) {
+    app.use(expressValidator());
+
     //new user
     app.post('/user', function (req, res) {
         var schema = {
@@ -47,6 +50,22 @@ module.exports = function (app) {
                             messageError: 'Validasi error'
                         });
                 }
+
+                new Users().where({
+                    email: req.body.email
+                }).count('id')
+                    .then(function (count) {
+                        if (count > 0) {
+                            return res.send({
+                                message: "Email must be unique"
+                            })
+                        }
+                    }).catch(function (error) {
+                        res.send({
+                            message: "Error" + error
+                        })
+                    });
+
                 var activationCode = randomstring.generate(20);
                 var user = _.pick(req.body, 'firstName', 'lastName', 'email', 'password');
                 var linkActivation = config.baseurl + '/user/activation' + "?code=" + activationCode + "&email=" + user.email;
