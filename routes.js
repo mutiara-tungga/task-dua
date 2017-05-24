@@ -59,7 +59,6 @@ module.exports = function (app) {
                     activaion_code: activationCode
                 }).save()
                     .then(function (model) {
-                        console.log(model);
                         client.sendEmail({
                             "From": "no-reply@skyshi.com",
                             "To": user.email,
@@ -128,8 +127,7 @@ module.exports = function (app) {
                         messageError: "Password wrong"
                     });
                 }
-                console.log(typeof password);
-                console.log(typeof model.attributes.password);
+
                 if (bcrypt.compareSync(password, model.attributes.password)) {
                     var user = {
                         id: model.id,
