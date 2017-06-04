@@ -10,7 +10,7 @@ module.exports = function (app) {
     app.use(bodyParser.json());
     app.use(expressValidator());
 
-    app.post('/user', controller.createNewUser);
+    app.post('/user', middleware.inputValidationForCreate,controller.createNewUser);
     app.get('/user/activation', controller.accountActivation);
     app.post('/user/login', controller.login);
 

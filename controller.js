@@ -5,7 +5,7 @@ var randomstring = require('randomstring');
 var _ = require('underscore');
 var bcrypt = require('bcrypt');
 var postmark = require('postmark');
-var jwt = require('jsonwebtoken');
+var jwt = require('jsonwebtoken'); //fungsi nya sama kayak session, di javascript tidak ada session
 
 var client = new postmark.Client(config.apiKeyPostmarkapp);
 
@@ -15,12 +15,13 @@ var Users = bookshelf.Model.extend({
         this.on('saving', this.assertEmailUnique); //sebelum melakukan saving melakukan assertEmailUnique
     },
     assertEmailUnique: function (model, attributes, options) {
-        if (this.hasChanged('email')) { //bila ada perubahan pada password
+        if (this.hasChanged('email')) { //bila ada perubahan pada email
             return Users
                 .query('where', 'email', this.get('email'))
-                .fetch(_.pick(options || {}, 'transacting')) //transacting mksudnya adalah run query in transaction
-                .then(function (existing) {
-                    if (existing) {
+                // .fetch(_.pick(options || {}, 'transacting')) //transacting mksudnya adalah run query in transaction
+                .fetch()
+                .then(function (existingUser) {
+                    if (existingUser) {
                         throw new Error('Email must unique');
                     }
 
@@ -31,73 +32,41 @@ var Users = bookshelf.Model.extend({
 });
 
 exports.createNewUser = function (req, res) {
-    var schema = {
-        'firstName': {
-            notEmpty: true,
-            errorMessage: 'First name invalid'
-        },
-        'lastName': {
-            notEmpty: true,
-            errorMessage: 'Last name invalid'
-        },
-        'email': {
-            notEmpty: true,
-            isEmail: {
-                errorMessage: 'Invalid email'
-            }
-        },
-        'password': {
-            notEmpty: true,
-            errorMessage: 'Password Invalid'
-        }
-    }
-    req.checkBody(schema);
+    var activationCode = randomstring.generate(20);
+    var user = _.pick(req.body, 'firstName', 'lastName', 'email', 'password');
+    var linkActivation = config.baseurl + '/user/activation' + "?code=" + activationCode + "&email=" + user.email;
+    var hashPassword = bcrypt.hashSync(user.password, 10); //hash password
 
-    req.getValidationResult()
-        .then(function (result) {
-            if (!result.isEmpty()) {
-                return res.status(400)
-                    .send({
-                        messageError: 'Validasi error' + result
-                    });
-            }
-
-            var activationCode = randomstring.generate(20);
-            var user = _.pick(req.body, 'firstName', 'lastName', 'email', 'password');
-            var linkActivation = config.baseurl + '/user/activation' + "?code=" + activationCode + "&email=" + user.email;
-            var hashPassword = bcrypt.hashSync(user.password, 10); //hash password
-            new Users({
-                first_name: user.firstName,
-                last_name: user.lastName,
-                email: user.email,
-                password: hashPassword,
-                activaion_code: activationCode
-            }).save()
-                .then(function (model) {
-                    client.sendEmail({
-                        "From": config.postmarkappServiceSender,
-                        "To": user.email,
-                        "Subject": "Account Activation",
-                        "TextBody": "Hello",
-                        "HtmlBody": "<html><body><p> Your Account : <br> First Name : "
-                        + user.firstName + "<br> - Last Name : "
-                        + user.lastName + "<br> - Email : "
-                        + user.email + "<br> - Password : "
-                        + user.password + "<br>To activate your account visit link below : <a href='"
-                        + linkActivation + "'>Activate my account</a></p></body></html>"
-                    });
-                    res.send({
-                        first_name: model.attributes.first_name,
-                        last_name: model.attributes.last_name,
-                        email: model.attributes.email
-                    });
-                }).catch(function (error) {
-                    res.send({
-                        errorMessage: "Error" + error
-                    });
-                })
-        });//akhir get validation
-
+    new Users({
+        first_name: user.firstName,
+        last_name: user.lastName,
+        email: user.email,
+        password: hashPassword,
+        activaion_code: activationCode
+    }).save()
+        .then(function (userModel) {
+            client.sendEmail({
+                "From": config.postmarkappServiceSender,
+                "To": user.email,
+                "Subject": "Account Activation",
+                "TextBody": "Hello",
+                "HtmlBody": "<html><body><p> Your Account : <br> First Name : "
+                + user.firstName + "<br> - Last Name : "
+                + user.lastName + "<br> - Email : "
+                + user.email + "<br> - Password : "
+                + user.password + "<br>To activate your account visit link below : <a href='"
+                + linkActivation + "'>Activate my account</a></p></body></html>"
+            });
+            res.send({
+                first_name: userModel.get('first_name'),
+                last_name: userModel.get('last_name'),
+                email: userModel.get('email')
+            });
+        }).catch(function (error) {
+            res.send({
+                errorMessage: "Error" + error
+            });
+        })
 }
 
 exports.accountActivation = function (req, res) {
@@ -113,7 +82,7 @@ exports.accountActivation = function (req, res) {
         }).save(
             { status: 1 },
             { patch: true }
-            ).then(function (model) {
+            ).then(function (userModel) {
                 res.send({
                     message: 'Aktivasi akun berhasil silahkan login'
                 });
@@ -126,24 +95,26 @@ exports.accountActivation = function (req, res) {
 }
 
 exports.login = function (req, res) {
+    var emailReq = req.body.email;
+    var passwordReq = req.body.password;
+
     new Users().where({
-        email: req.body.email,
+        email: emailReq,
         status: 1
     }).fetch()
-        .then(function (model) {
-            password = req.body.password;
-            if (typeof password !== 'string' && typeof password !== 'undefined') {
-                password = password.toString();
-            } else if (req.password === 'undefined') {
-                res.send({
+        .then(function (userModel) {
+            if (typeof passwordReq !== 'string' && typeof passwordReq !== 'undefined') {
+                passwordReq = passwordReq.toString();
+            } else if (typeof passwordReq === 'undefined') {
+                return res.send({
                     messageError: "Password wrong"
                 });
             }
 
-            if (bcrypt.compareSync(password, model.attributes.password)) {
+            if (bcrypt.compareSync(passwordReq, userModel.get('password'))) {
                 var user = {
-                    id: model.id,
-                    email: model.attributes['email']
+                    id: userModel.id,
+                    email: userModel.get('email')
                 };
 
                 var token = jwt.sign(user, config.secret, {
@@ -175,11 +146,11 @@ exports.profile = function (req, res) {
         id: id,
         email: email
     }).fetch()
-        .then(function (model) {
+        .then(function (userModel) {
             res.send({
-                firstName: model.attributes.first_name,
-                lastName: model.attributes.last_name,
-                email: model.attributes.email
+                firstName: userModel.get('first_name'),
+                lastName: userModel.get('last_name'),
+                email: userModel.get('email')
             });
         }).catch(function (error) {
             res.send({
@@ -199,12 +170,12 @@ exports.forgotPassword = function (req, res) {
             .then(function (user) { //user adalah model yang tidak perlu kata "new""
                 user.save({
                     reset_password_code: randomCode
-                }).then(function (model) {
+                }).then(function (userModel) {
                     client.sendEmail({
                         "From": config.postmarkappServiceSender,
-                        "To": model.attributes.email,
+                        "To": userModel.get('email'),
                         "Subject": "Reset Password",
-                        "TextBody": "To reset your password use this code : " + model.attributes.reset_password_code
+                        "TextBody": "To reset your password use this code : " + userModel.get('reset_password_code')
                     });
                     res.send({
                         message: "Silahkan cek email untuk reset password"
@@ -227,16 +198,16 @@ exports.forgotPassword = function (req, res) {
 exports.resetPassword = function (req, res) {
     var user = _.pick(req.body, 'email', 'code', 'newPassword');
 
-    if (user.email !== 'undefined' && user.code !== 'undefined' && user.newPassword !== 'undefined') {
+    if (typeof user.email !== 'undefined' && typeof user.code !== 'undefined' && typeof user.newPassword !== 'undefined') {
         hasNewPassword = bcrypt.hashSync(user.newPassword, 10);
         Users
             .forge({
                 email: user.email,
                 reset_password_code: user.code
             }).fetch({ require: true })
-            .then(function (model) {
-                if (model.attributes.reset_password_code !== null) {
-                    model.save({
+            .then(function (userModel) {
+                if (userModel.get('reset_password_code') !== null) {
+                    userModel.save({
                         password: hasNewPassword,
                         reset_password_code: null
                     }).then(function () {
